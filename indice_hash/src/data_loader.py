@@ -1,22 +1,11 @@
-"""
-Módulo Data Loader
-===================
-Responsável por carregar o arquivo de dados (words.txt, ~466 mil palavras,
-uma por linha, todas únicas -> cada palavra é uma chave) para a memória.
-"""
+"""Carregamento das chaves a partir de um arquivo de texto."""
 
 from pathlib import Path
 from typing import List, Optional
 
 
 def carregar_palavras(caminho_arquivo: str, limite: Optional[int] = None) -> List[str]:
-    """
-    Lê o arquivo de palavras e retorna uma lista de chaves (strings).
-
-    limite: se informado, carrega apenas as N primeiras palavras (útil para
-    testes rápidos ou para não sobrecarregar a interface gráfica com 466 mil
-    linhas). Se None, carrega o arquivo inteiro.
-    """
+    """Lê as palavras do arquivo, opcionalmente limitando a quantidade."""
     caminho = Path(caminho_arquivo)
     if not caminho.exists():
         raise FileNotFoundError(f"Arquivo de dados não encontrado: {caminho_arquivo}")

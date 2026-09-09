@@ -1,10 +1,4 @@
-"""
-Módulo Página
-=============
-Representa a estrutura de divisão e alocação física da tabela na "mídia de
-armazenamento" (simulada em memória). Cada página guarda um número limitado
-de registros (tuplas), definido pelo tamanho da página escolhido pelo usuário.
-"""
+"""Representação e criação das páginas da tabela."""
 
 from dataclasses import dataclass, field
 from typing import List
@@ -12,7 +6,7 @@ from typing import List
 
 @dataclass
 class Pagina:
-    """Representa uma página física contendo um subconjunto de registros."""
+    """Página física contendo um subconjunto de registros."""
 
     numero: int
     capacidade: int
@@ -22,7 +16,7 @@ class Pagina:
         return len(self.registros) >= self.capacidade
 
     def adicionar_registro(self, chave: str) -> bool:
-        """Adiciona um registro à página, se houver espaço."""
+        """Adiciona um registro se houver espaço."""
         if self.esta_cheia():
             return False
         self.registros.append(chave)
@@ -40,24 +34,21 @@ class Pagina:
 
 
 def calcular_quantidade_paginas(total_registros: int, tamanho_pagina: int) -> int:
-    """Calcula quantas páginas são necessárias para armazenar todos os
-    registros, dado o tamanho (capacidade) de cada página."""
+    """Calcula o número de páginas necessário para os registros."""
     if tamanho_pagina <= 0:
         raise ValueError("O tamanho da página deve ser maior que zero.")
-    return -(-total_registros // tamanho_pagina)  # teto (ceil) sem usar math
+    return -(-total_registros // tamanho_pagina)
 
 
 def calcular_tamanho_pagina(total_registros: int, quantidade_paginas: int) -> int:
-    """Calcula o tamanho (capacidade) de cada página, dado o número de
-    páginas desejado pelo usuário (caminho inverso do parâmetro)."""
+    """Calcula a capacidade das páginas a partir da quantidade desejada."""
     if quantidade_paginas <= 0:
         raise ValueError("A quantidade de páginas deve ser maior que zero.")
     return -(-total_registros // quantidade_paginas)  # teto (ceil)
 
 
 def paginar_registros(registros: List[str], tamanho_pagina: int) -> List[Pagina]:
-    """Divide a lista de registros em páginas sequenciais, respeitando a
-    ordem original do arquivo de dados."""
+    """Divide os registros em páginas sequenciais."""
     paginas: List[Pagina] = []
     total = len(registros)
     num_paginas = calcular_quantidade_paginas(total, tamanho_pagina)

@@ -1,11 +1,4 @@
-"""
-Módulo GUI
-==========
-Interface gráfica (Tkinter/ttk) que ilustra a construção e o funcionamento
-de um índice hash estático: carga de dados, paginação, construção do índice,
-busca por chave (via índice) e table scan, com estatísticas de colisão,
-overflow e custo de acesso a disco (páginas lidas).
-"""
+"""Interface gráfica para construção e consulta do índice hash."""
 
 import os
 import threading
@@ -21,9 +14,6 @@ from hash_function import FUNCOES_HASH
 _DIR_SRC = os.path.dirname(os.path.abspath(__file__))
 CAMINHO_PADRAO_DADOS = os.path.normpath(os.path.join(_DIR_SRC, "..", "data", "words.txt"))
 
-# ---------------------------------------------------------------------------
-# Paleta de cores
-# ---------------------------------------------------------------------------
 COR_FUNDO = "#f4f6fb"
 COR_PAINEL = "#ffffff"
 COR_PRIMARIA = "#2b3a67"        # azul petróleo escuro (header, botões principais)
@@ -63,21 +53,32 @@ class AplicacaoIndiceHash(tk.Tk):
         self._maximizar_janela()
 
     def _maximizar_janela(self):
-        """Abre a janela já maximizada, ocupando a tela disponível. Se o
-        conteúdo ainda assim não couber, a área central tem rolagem."""
+        """Maximiza a janela e aplica um tamanho manual se necessário."""
+        largura_tela = self.winfo_screenwidth()
+        altura_tela = self.winfo_screenheight()
+
+        self.update_idletasks()
+        largura_antes = self.winfo_width()
+        altura_antes = self.winfo_height()
+
         try:
-            self.state("zoomed")  # Windows e algumas distros Linux
+            self.state("zoomed")
         except tk.TclError:
             try:
                 self.attributes("-zoomed", True)  # Linux/alguns window managers
             except tk.TclError:
-                largura = self.winfo_screenwidth()
-                altura = self.winfo_screenheight()
-                self.geometry(f"{largura}x{altura}+0+0")
+                pass
 
-    # ------------------------------------------------------------------
-    # Estilo global (ttk)
-    # ------------------------------------------------------------------
+        self.update_idletasks()
+        largura_depois = self.winfo_width()
+        altura_depois = self.winfo_height()
+
+        nao_mudou = (largura_depois, altura_depois) == (largura_antes, altura_antes)
+        maior_que_tela = largura_depois > largura_tela or altura_depois > altura_tela
+
+        if nao_mudou and maior_que_tela:
+            self.geometry(f"{largura_tela}x{altura_tela}+0+0")
+
     def _configurar_estilo(self):
         style = ttk.Style(self)
         try:
@@ -127,20 +128,14 @@ class AplicacaoIndiceHash(tk.Tk):
         style.configure("TProgressbar", background=COR_ACENTO, troughcolor="#e4e8f4",
                          bordercolor=COR_FUNDO, lightcolor=COR_ACENTO, darkcolor=COR_ACENTO)
 
-    # ------------------------------------------------------------------
-    # Layout geral
-    # ------------------------------------------------------------------
     def _construir_layout(self):
         self._construir_header()
 
-        # Barra de status fixa embaixo (fora da área rolável)
         self.status_var = tk.StringVar(value="Pronto. Configure os parâmetros e construa o índice.")
         status_bar = tk.Label(self, textvariable=self.status_var, bg=COR_PRIMARIA, fg="#ffffff",
                                anchor="w", padx=14, pady=5, font=("Segoe UI", 9))
         status_bar.pack(fill="x", side="bottom")
 
-        # Área central com rolagem: garante que NADA fique cortado/inacessível
-        # quando o conteúdo (tabelas, cards, tabs) for mais alto que a tela.
         self.corpo = self._construir_area_rolavel()
 
         self._construir_frame_configuracao()
@@ -161,11 +156,7 @@ class AplicacaoIndiceHash(tk.Tk):
         self._construir_tab_busca()
 
     def _construir_area_rolavel(self) -> tk.Widget:
-        """Cria um Canvas + Scrollbars (vertical e horizontal) envolvendo um
-        Frame interno. Tudo que for empacotado dentro do frame retornado
-        passa a rolar automaticamente se não couber na janela — nem para
-        baixo, nem para os lados — evitando que qualquer informação fique
-        cortada/inacessível, independentemente do tamanho da tela."""
+        """Cria a área central com rolagem vertical e horizontal."""
         container = tk.Frame(self, bg=COR_FUNDO)
         container.pack(fill="both", expand=True)
         container.rowconfigure(0, weight=1)
@@ -187,10 +178,6 @@ class AplicacaoIndiceHash(tk.Tk):
             canvas.configure(scrollregion=canvas.bbox("all"))
 
         def _ajustar_largura_interna(evento):
-            # O frame interno nunca fica mais estreito do que precisa: se a
-            # janela for maior que o conteúdo, ele estica para preencher;
-            # se for menor, mantém a largura mínima necessária e a barra
-            # horizontal permite alcançar o que não coube.
             largura_necessaria = frame_interno.winfo_reqwidth()
             nova_largura = max(evento.width, largura_necessaria)
             canvas.itemconfig(janela_id, width=nova_largura)
@@ -207,7 +194,6 @@ class AplicacaoIndiceHash(tk.Tk):
                 canvas.yview_scroll(int(-1 * (evento.delta / 120)), "units")
 
         def _rolar_horizontal(evento):
-            # Shift + roda do mouse rola na horizontal (padrão comum)
             if evento.delta:
                 canvas.xview_scroll(int(-1 * (evento.delta / 120)), "units")
 
@@ -228,9 +214,6 @@ class AplicacaoIndiceHash(tk.Tk):
         ttk.Label(interno, text="Construção, busca indexada e table scan sobre uma tabela paginada",
                   style="Subtitulo.Header.TLabel").pack(anchor="w", pady=(2, 0))
 
-    # ------------------------------------------------------------------
-    # Frame de configuração (topo)
-    # ------------------------------------------------------------------
     def _construir_frame_configuracao(self):
         wrapper = ttk.Frame(self.corpo, style="TFrame")
         wrapper.pack(fill="x", padx=16, pady=14)
@@ -241,20 +224,17 @@ class AplicacaoIndiceHash(tk.Tk):
         ttk.Label(frame, text="⚙  Configuração e Carga do Índice", style="SecaoCard.TLabel").grid(
             row=0, column=0, columnspan=5, sticky="w", pady=(0, 12))
 
-        # Arquivo de dados
         ttk.Label(frame, text="Arquivo de dados:", style="Card.TLabel").grid(row=1, column=0, sticky="w", padx=5, pady=5)
         self.var_arquivo = tk.StringVar(value=CAMINHO_PADRAO_DADOS)
         ttk.Entry(frame, textvariable=self.var_arquivo, width=55).grid(row=1, column=1, columnspan=3, sticky="we", padx=5)
         ttk.Button(frame, text="Procurar...", style="Secundario.TButton",
                    command=self._selecionar_arquivo).grid(row=1, column=4, padx=5)
 
-        # Limite de palavras
         ttk.Label(frame, text="Limitar nº de palavras (vazio = usar todas):", style="Card.TLabel").grid(
             row=2, column=0, sticky="w", padx=5, pady=5)
         self.var_limite = tk.StringVar(value="")
         ttk.Entry(frame, textvariable=self.var_limite, width=15).grid(row=2, column=1, sticky="w", padx=5)
 
-        # Tamanho x quantidade de páginas
         ttk.Label(frame, text="Definir paginação por:", style="Card.TLabel").grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.var_modo_paginacao = tk.StringVar(value="tamanho")
         ttk.Radiobutton(frame, text="Tamanho da página (registros/página)",
@@ -274,7 +254,6 @@ class AplicacaoIndiceHash(tk.Tk):
         self.entry_qtd_paginas.grid(row=4, column=3, sticky="w", padx=5)
         ttk.Label(frame, text="páginas", style="SuaveCard.TLabel").grid(row=4, column=4, sticky="w")
 
-        # FR e função hash
         ttk.Label(frame, text="FR (tuplas por bucket):", style="Card.TLabel").grid(row=5, column=0, sticky="w", padx=5, pady=5)
         self.var_fr = tk.StringVar(value="8")
         ttk.Entry(frame, textvariable=self.var_fr, width=12).grid(row=5, column=1, sticky="w", padx=5)
@@ -284,9 +263,15 @@ class AplicacaoIndiceHash(tk.Tk):
         ttk.Combobox(frame, textvariable=self.var_funcao_hash, values=list(FUNCOES_HASH.keys()),
                      state="readonly", width=28).grid(row=5, column=3, columnspan=2, sticky="w", padx=5)
 
-        # Botão construir + progresso
+        ttk.Label(frame, text="Fator de carga (folga do bucket):", style="Card.TLabel").grid(
+            row=6, column=0, sticky="w", padx=5, pady=5)
+        self.var_fator_carga = tk.StringVar(value="0.8")
+        ttk.Entry(frame, textvariable=self.var_fator_carga, width=12).grid(row=6, column=1, sticky="w", padx=5)
+        ttk.Label(frame, text="0 a 1 — menor valor = mais buckets, menos overflow (recomendado: 0.7–0.9)",
+                  style="SuaveCard.TLabel").grid(row=6, column=2, columnspan=3, sticky="w", padx=5)
+
         acao_frame = ttk.Frame(frame, style="Card.TFrame")
-        acao_frame.grid(row=6, column=0, columnspan=5, sticky="we", pady=(14, 0))
+        acao_frame.grid(row=7, column=0, columnspan=5, sticky="we", pady=(14, 0))
         self.btn_construir = ttk.Button(acao_frame, text="▶  Carregar dados e Construir Índice",
                                          command=self._iniciar_construcao)
         self.btn_construir.pack(side="left")
@@ -310,9 +295,6 @@ class AplicacaoIndiceHash(tk.Tk):
         if caminho:
             self.var_arquivo.set(caminho)
 
-    # ------------------------------------------------------------------
-    # Tab 1: Páginas
-    # ------------------------------------------------------------------
     def _construir_tab_paginas(self):
         outer = ttk.Frame(self.tab_paginas, style="TFrame", padding=16)
         outer.pack(fill="both", expand=True)
@@ -347,9 +329,6 @@ class AplicacaoIndiceHash(tk.Tk):
         self.label_resumo_paginas = ttk.Label(outer, text="", style="Suave.TLabel", wraplength=1100, justify="left")
         self.label_resumo_paginas.pack(anchor="w", pady=(10, 0))
 
-    # ------------------------------------------------------------------
-    # Tab 2: Estatísticas (cards coloridos)
-    # ------------------------------------------------------------------
     def _construir_tab_estatisticas(self):
         outer = ttk.Frame(self.tab_estatisticas, style="TFrame", padding=16)
         outer.pack(fill="both", expand=True)
@@ -362,6 +341,8 @@ class AplicacaoIndiceHash(tk.Tk):
             ("NB (nº de buckets)", COR_PRIMARIA),
             ("FR (tuplas/bucket)", COR_PRIMARIA),
             ("Nº de páginas", COR_PRIMARIA),
+            ("Fator de carga alvo", COR_ACENTO),
+            ("Carga média real (NR/NB)", COR_ACENTO),
             ("Total de inserções", COR_ACENTO),
             ("Colisões", "#c98a2c"),
             ("Taxa de colisões (%)", "#c98a2c"),
@@ -387,9 +368,13 @@ class AplicacaoIndiceHash(tk.Tk):
                      wraplength=220, justify="left").pack(anchor="w", padx=14, pady=(0, 8))
             self.labels_stats[chave] = valor_var
 
-        nota = ttk.Label(outer, text=("Colisão = duas chaves diferentes mapeadas para o mesmo bucket. "
-                                       "Overflow = o bucket já estava com FR entradas e precisou de um "
-                                       "bucket de transbordamento encadeado."),
+        nota = ttk.Label(outer, text=("Colisão = duas chaves diferentes mapeadas para o mesmo bucket (normal e "
+                                       "esperado quando FR > 1). Overflow = o bucket já estava com FR entradas e "
+                                       "precisou de um bucket de transbordamento encadeado (esse é o que gera "
+                                       "custo extra de acesso a disco). O fator de carga controla o overflow: "
+                                       "valores menores que 1 criam mais buckets de propósito, dando folga e "
+                                       "reduzindo a chance de estouro — sem violar a regra do enunciado (NB > NR/FR "
+                                       "continua sempre garantido como piso mínimo)."),
                           style="Suave.TLabel", wraplength=1100, justify="left")
         nota.pack(anchor="w", pady=(6, 0))
 
@@ -399,9 +384,6 @@ class AplicacaoIndiceHash(tk.Tk):
             if chave in self.labels_stats:
                 self.labels_stats[chave].set(str(valor))
 
-    # ------------------------------------------------------------------
-    # Tab 3: Busca e Table Scan
-    # ------------------------------------------------------------------
     def _construir_tab_busca(self):
         outer = ttk.Frame(self.tab_busca, style="TFrame", padding=16)
         outer.pack(fill="both", expand=True)
@@ -458,9 +440,6 @@ class AplicacaoIndiceHash(tk.Tk):
         frame.configure(bg=cor_fundo)
         label.configure(bg=cor_fundo, fg=cor_texto, text=texto)
 
-    # ------------------------------------------------------------------
-    # Construção do índice (carga + paginação + build) em thread separada
-    # ------------------------------------------------------------------
     def _iniciar_construcao(self):
         try:
             fr = int(self.var_fr.get())
@@ -468,6 +447,14 @@ class AplicacaoIndiceHash(tk.Tk):
                 raise ValueError
         except ValueError:
             messagebox.showerror("Erro", "FR deve ser um número inteiro maior que zero.")
+            return
+
+        try:
+            fator_carga = float(self.var_fator_carga.get().replace(",", "."))
+            if not (0 < fator_carga <= 1):
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Erro", "O fator de carga deve ser um número entre 0 (exclusivo) e 1 (inclusivo), ex.: 0.8.")
             return
 
         limite_txt = self.var_limite.get().strip()
@@ -507,13 +494,13 @@ class AplicacaoIndiceHash(tk.Tk):
 
         thread = threading.Thread(
             target=self._construir_em_background,
-            args=(arquivo, limite, modo, tamanho_pagina_input, qtd_paginas_input, fr, funcao_hash),
+            args=(arquivo, limite, modo, tamanho_pagina_input, qtd_paginas_input, fr, funcao_hash, fator_carga),
             daemon=True,
         )
         thread.start()
 
     def _construir_em_background(self, arquivo, limite, modo, tamanho_pagina_input,
-                                  qtd_paginas_input, fr, funcao_hash):
+                                  qtd_paginas_input, fr, funcao_hash, fator_carga):
         try:
             palavras = carregar_palavras(arquivo, limite=limite)
             total = len(palavras)
@@ -525,7 +512,7 @@ class AplicacaoIndiceHash(tk.Tk):
 
             paginas = paginar_registros(palavras, tamanho_pagina)
 
-            indice = IndiceHash(paginas, fr, funcao_hash)
+            indice = IndiceHash(paginas, fr, funcao_hash, fator_carga=fator_carga)
             indice.construir()
 
             self.after(0, self._finalizar_construcao, indice, paginas, total, tamanho_pagina)
@@ -580,9 +567,6 @@ class AplicacaoIndiceHash(tk.Tk):
                              f"páginas={len(paginas)}.")
         self.notebook.select(self.tab_estatisticas)
 
-    # ------------------------------------------------------------------
-    # Busca via índice
-    # ------------------------------------------------------------------
     def _executar_busca(self):
         if self.indice is None:
             return
@@ -615,9 +599,6 @@ class AplicacaoIndiceHash(tk.Tk):
         self.texto_scan.delete("1.0", tk.END)
         self.texto_scan.config(state="disabled")
 
-    # ------------------------------------------------------------------
-    # Table scan
-    # ------------------------------------------------------------------
     def _executar_table_scan(self):
         if self.indice is None or not self.ultima_busca_ok:
             return
